@@ -1,0 +1,45 @@
+ZeroMemory和memset的区别：
+1、ZeroMemory是微软的SDK提供的，memset是属于C Run-time Library提供的。因此ZeroMemory只能用于Windows系统，而memset还可用于其他系统。
+2、ZeroMemory是一个宏，只是用于把一段内存的内容置零，内部其实是用 memset实现的，而memset除了对内存进行清零操作，还可以将内存置成别的字符。
+3、如果程序是Win32程序而且不想连接c运行时库，就用ZeroMemory；如果需要跨平台，就用memset。
+所以，如果ZeroMemory和memset用于清零操作，其本质是一样的。
+ZeroMemory和 “={0}”的区别：
+1、ZeroMemory会将结构中所有字节置0，而“={0}”只会将成员置0，其中填充字节不变。
+2、一个struct有构造函数或虚函数时，ZeroMemory可以编译通过，而“={0}”会产生编译错误。其中，“={0}”的编译错误起到了一定的保护作用，因为对一个有虚函数的对象使用ZeroMemory时，会将其虚函数的指针置0，这是非常危险的（调用虚函数时，空指针很可能引起程序崩溃）。
+示例代码
+struct SPerson
+{char c;float s;};
+class CTestVirtual
+{public:
+CTestVirtual(){}
+/// 虚函数
+virtual int Draw()
+{return 10;}
+int a;
+};
+int main(int argc, char* argv[])
+{
+char sztmp[20];
+/// 安全操作
+ZeroMemory(sztmp, sizeof(sztmp));
+/// 安全操作
+SPerson sTest = {0};
+int i = sizeof(SPerson);
+//// 会引起编译错误！
+//CTestVirtual otv = {0};
+CTestVirtual tv;
+/// 危险操作!
+ZeroMemory(&tv, sizeof(tv));
+/// 因为对象没有使用虚指针调用函数，所以程序运行到这里不会崩溃
+tv.Draw();
+/// 将对象地址赋给指针
+CTestVirtual *pTv = &tv;
+//虚函数的指针已经被清零，因此程序运行到这里会引起崩溃!
+//错误信息：Unhandled exception at 0x004010b1 in Solution.exe:
+//0xC0000005: Access violation reading location 0x00000000.
+pTv->Draw();
+return 0;
+}
+因此，在windows平台下，数组或纯结构使用ZeroMemory是安全的，而类(class)就使用构造函数进行初始化，不要调用ZeroMemory。
+另外，如果一个类的结构中包含STL模板（Vector、List、Map等等），那么使用ZeroMemory对这个类的对象中进行清零操作也会引起一系列的崩溃问题（指针指向内存错误、迭代器越界访问等）。所以，再次强烈建议：类(class)只使用构造函数进行初始化，不要调用ZeroMemory进行清零操作。
+在Windows编程中，ZeroMemory的作用是用0来填充一块内存区域，主要是你填充一些数据结构时把它们填为0比较保险，因为很多默认的参数取值为NULL，操作系统会替你解决。
